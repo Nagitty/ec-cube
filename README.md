@@ -23,6 +23,7 @@
 
 開発ドキュメントの [インストール方法](https://doc4.ec-cube.net/quickstart/install) の手順に従ってインストールしてください。
 
+
 ### CSS の編集・ビルド方法
 
 [Sass](https://sass-lang.com) を使用して記述されています。
