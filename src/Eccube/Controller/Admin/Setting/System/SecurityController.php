@@ -21,6 +21,9 @@ use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
+use League\OAuth2\Client\Provider\Google;
 
 class SecurityController extends AbstractController
 {
@@ -138,4 +141,61 @@ class SecurityController extends AbstractController
             'form' => $form->createView(),
         ];
     }
+}
+
+// Google SSO用の新しいルートを追加
+/**
+ * @Route("/admin/login/google", name="admin_login_google", methods={"GET"})
+ */
+public function redirectToGoogle(): RedirectResponse
+{
+    $provider = new Google([
+        'clientId'     => 'your-google-client-id',
+        'clientSecret' => 'your-google-client-secret',
+        'redirectUri'  => $this->generateUrl('admin_google_callback', [], UrlGeneratorInterface::ABSOLUTE_URL),
+    ]);
+
+    $authorizationUrl = $provider->getAuthorizationUrl();
+    $this->session->set('oauth2state', $provider->getState());
+
+    return new RedirectResponse($authorizationUrl);
+}
+
+/**
+ * @Route("/admin/login/google/callback", name="admin_google_callback", methods={"GET"})
+ */
+public function handleGoogleCallback(Request $request): Response
+{
+    $provider = new Google([
+        'clientId'     => 'your-google-client-id',
+        'clientSecret' => 'your-google-client-secret',
+        'redirectUri'  => $this->generateUrl('admin_google_callback', [], UrlGeneratorInterface::ABSOLUTE_URL),
+    ]);
+
+    // Check given state against previously stored one to mitigate CSRF attack
+    if (empty($request->query->get('state')) || ($request->query->get('state') !== $this->session->get('oauth2state'))) {
+        $this->session->remove('oauth2state');
+        throw new \RuntimeException('Invalid state');
+    }
+
+    // Try to get an access token (using the authorization code grant)
+    $token = $provider->getAccessToken('authorization_code', [
+        'code' => $request->query->get('code')
+    ]);
+
+    // Optional: Now you have a token you can look up a users profile data
+    try {
+        // We got an access token, let's now get the user's details
+        $ownerDetails = $provider->getResourceOwner($token);
+
+        // Use these details to create a new profile
+        $userEmail = $ownerDetails->getEmail();
+        // ログイン処理をここに追加
+
+    } catch (\Exception $e) {
+        // Failed to get user details
+        exit('Oh dear...');
+    }
+
+    return $this->redirectToRoute('admin_dashboard');
 }
